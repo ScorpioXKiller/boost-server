@@ -33,3 +33,7 @@
 
 # IDE specific files
 .vs
+boost-server
+x64
+.sln
+*.vcxproj
