@@ -1,4 +1,4 @@
-#include <boost/asio.hpp>
+/*#include <boost/asio.hpp>
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -11,7 +11,7 @@
 #else
   #include <sys/stat.h>
   #include <sys/types.h>
-  #include <errno.h>
+  #include <cerrno>
 #endif // DEBUG
 
 using namespace boost::asio::ip;
@@ -232,5 +232,25 @@ int main()
 		std::cerr << "[Server] Exception: " << e.what() << "\n";
 	}
 
+	return 0;
+}*/
+
+#include <boost/asio.hpp>
+#include "Server.h"
+#include <iostream>
+
+int main()
+{
+	try
+	{
+		boost::asio::io_context io_context;
+		Server server(io_context, 1234);
+		std::cout << "[Server] Listening on port 1234...\n";
+		io_context.run();
+	}
+	catch (const std::exception& e)
+	{
+		std::cerr << "[Server] Exception: " << e.what() << "\n";
+	}
 	return 0;
 }
