@@ -5,9 +5,6 @@
 #include <iostream>
 #include <string>
 
-using namespace std;
-using namespace boost::asio;
-
 static const string BACKUP_ROOT = "c:/backupsvr/";
 
 Session::Session(ip::tcp::socket socket) : socket_(std::move(socket)) {}

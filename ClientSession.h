@@ -5,14 +5,17 @@
 #include <memory>
 #include <string>
 
-class ClientSession : public std::enable_shared_from_this<ClientSession>
+using namespace std;
+
+class ClientSession : public enable_shared_from_this<ClientSession>
 {
 public:
-    explicit ClientSession(std::shared_ptr<boost::asio::ip::tcp::socket> socket);
+    explicit ClientSession(shared_ptr<boost::asio::ip::tcp::socket> socket);
     void start();
 
 private:
     void handle_read();
 
-    std::shared_ptr<boost::asio::ip::tcp::socket> socket_;
+    shared_ptr<boost::asio::ip::tcp::socket> socket_;
+	vector<char> buffer_;
 };
