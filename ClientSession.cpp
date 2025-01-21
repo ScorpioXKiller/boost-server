@@ -96,8 +96,8 @@ void ClientSession::handle_read()
         
         uint8_t  server_version = 1;  // e.g., server version
         uint16_t response_status = (uint16_t)ServerStatus::ERR_GENERAL; // default
-        std::string response_filename;    // For the response header
-        std::vector<unsigned char> response_payload;
+        string response_filename;    // For the response header
+        vector<unsigned char> response_payload;
 
         //--------------------------------------------------------------
         // 3) Create main folder + user folder if needed
@@ -142,6 +142,8 @@ void ClientSession::handle_read()
                 {
                     filename = filename.substr(last_slash + 1);
                 }
+
+				response_filename = filename;
 
                 // Save file
                 string file_path = user_folder + filename;
@@ -300,16 +302,14 @@ void ClientSession::handle_read()
 		vector<unsigned char> response;
 
         // (1) version (1 byte)
-        response.push_back(server_version);
+		write_uint8(response, server_version);
 
         // (2) status (2 bytes, LE)
-        response.push_back(static_cast<unsigned char>(response_status & 0xFF));
-        response.push_back(static_cast<unsigned char>((response_status >> 8) & 0xFF));
+		write_uint16_le(response, response_status);
 
         // (3) name_len (2 bytes, LE)
         uint16_t response_name_len = static_cast<uint16_t>(response_filename.size());
-        response.push_back(static_cast<unsigned char>(response_name_len & 0xFF));
-        response.push_back(static_cast<unsigned char>((response_name_len >> 8) & 0xFF));
+		write_uint16_le(response, response_name_len);
 
         // (4) filename
         response.insert(response.end(), response_filename.begin(), response_filename.end());
@@ -319,10 +319,7 @@ void ClientSession::handle_read()
         {
             // 4-byte payload size
             uint32_t psize = static_cast<uint32_t>(response_payload.size());
-            response.push_back(static_cast<unsigned char>(psize & 0xFF));
-            response.push_back(static_cast<unsigned char>((psize >> 8) & 0xFF));
-            response.push_back(static_cast<unsigned char>((psize >> 16) & 0xFF));
-            response.push_back(static_cast<unsigned char>((psize >> 24) & 0xFF));
+			write_uint32_le(response, psize);
 
             // payload
             response.insert(response.end(), response_payload.begin(), response_payload.end());

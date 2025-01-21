@@ -86,6 +86,40 @@ string hex_dump_limited(const unsigned char* data, size_t size, size_t max_bytes
     return oss.str();
 }
 
+uint16_t read_uint_16_le(unsigned char* data, short start, short end) {
+    return (static_cast<unsigned char>(data[start])) |
+        static_cast<uint16_t>((static_cast<unsigned char>(data[end]) << 8));
+}
+
+uint32_t read_uint_32_le(unsigned char* data) {
+    return (static_cast<uint32_t>(static_cast<unsigned char>(data[0]))) |
+        ((static_cast<uint32_t>(static_cast<unsigned char>(data[1])) << 8)) |
+        ((static_cast<uint32_t>(static_cast<unsigned char>(data[2])) << 16)) |
+        ((static_cast<uint32_t>(static_cast<unsigned char>(data[3])) << 24));
+}
+
+/// Write a single byte (uint8_t)
+void write_uint8(vector<unsigned char>& buffer, uint8_t value)
+{
+    buffer.push_back(value);
+}
+
+/// Write a 2-byte little-endian integer (uint16_t)
+void write_uint16_le(vector<unsigned char>& buffer, uint16_t value)
+{
+    buffer.push_back(static_cast<unsigned char>(value & 0xFF));
+    buffer.push_back(static_cast<unsigned char>((value >> 8) & 0xFF));
+}
+
+/// Write a 4-byte little-endian integer (uint32_t)
+void write_uint32_le(vector<unsigned char>& buffer, uint32_t value)
+{
+    buffer.push_back(static_cast<unsigned char>(value & 0xFF));
+    buffer.push_back(static_cast<unsigned char>((value >> 8) & 0xFF));
+    buffer.push_back(static_cast<unsigned char>((value >> 16) & 0xFF));
+    buffer.push_back(static_cast<unsigned char>((value >> 24) & 0xFF));
+}
+
 void print_request_table(
     uint32_t user_id,
     uint8_t client_version,

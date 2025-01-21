@@ -19,5 +19,10 @@
   - add _WIN32_WINNT=0x0601 to your project's Preprocessor Definitions.
   Assuming _WIN32_WINNT=0x0601 (i.e. Windows 7 target).
   utility.cpp
+  Please define _WIN32_WINNT or _WIN32_WINDOWS appropriately. For example:
+  - add -D_WIN32_WINNT=0x0601 to the compiler command line; or
+  - add _WIN32_WINNT=0x0601 to your project's Preprocessor Definitions.
+  Assuming _WIN32_WINNT=0x0601 (i.e. Windows 7 target).
+C:\Users\production\source\repos\ScorpioXKiller\boost-server\utility.cpp(171,17): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
   Generating Code...
-  boost-server.vcxproj -> C:\Users\dimag\source\repos\boost-server\x64\Debug\boost-server.exe
+  boost-server.vcxproj -> C:\Users\production\source\repos\ScorpioXKiller\boost-server\x64\Debug\boost-server.exe

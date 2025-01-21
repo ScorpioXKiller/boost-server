@@ -20,9 +20,3 @@ enum class ServerStatus : uint16_t {
 	ERR_NO_FILES = 1002,
 	ERR_GENERAL = 1003
 };
-
-uint16_t read_uint_16_le(unsigned char* data, short start = 0, short end = 1);
-uint32_t read_uint_32_le(unsigned char* data);
-
-void write_uint_16_le(char* data, uint16_t value);
-void write_uint_32_le(char* data, uint32_t value);
