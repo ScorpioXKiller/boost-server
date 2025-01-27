@@ -1,348 +1,287 @@
+/**
+ * @file ClientSession.h
+ * @brief ClientSession class implementation.
+ * @details This class manages the lifecycle of a client session, including reading requests, processing commands, and sending responses.
+ *
+ * @version 1.0
+ * @author Dmitriy Gorodov
+ * @id 342725405
+ * @date 24/01/2025
+ */
+
 #include "ClientSession.h"
-#include "protocols.h"
-
 #include "utility.h"
+#include "protocols.h"
+#include "ProtocolParcer.h"
+#include "FileManager.h"
+#include "Request.h"
+#include "Response.h"
+
 #include <iostream>
-#include <fstream>
-#include <thread>
 #include <filesystem>
+#include <thread>
 
-using boost::asio::ip::tcp;
-
-const string STORAGE_FOLDER = "c:/backupsvr/";
-const short MAX_BUFFER_SIZE = 4096;
-const short REQUEST_HEADER_SIZE = 8;
-const short PAYLOAD_FILE_SIZE = 4;
-
-ClientSession::ClientSession(shared_ptr<tcp::socket> socket)
-    : socket_(move(socket)){}
+ClientSession::ClientSession(std::shared_ptr<boost::asio::ip::tcp::socket> socket)
+    : socket_(std::move(socket))
+{
+}
 
 void ClientSession::start()
 {
     auto self = shared_from_this();
-    std::thread([self]()
-        {
-            self->handle_read();
+    std::thread([self]() {
+        self->handle_client_requests();
         }).detach();
 }
 
-void ClientSession::handle_read()
+void ClientSession::handle_client_requests() const
 {
     try
     {
-        boost::system::error_code error;
+        // Create a protocol parser on this socket 
+        ProtocolParcer parser(socket_);
 
-        // --------------------------------------------------------------------
-        // 1) Read the main header (8 bytes):
-        //    [0..3] user_id   (4 bytes, little-endian)
-        //    [4]    version   (1 byte)
-        //    [5]    op_code   (1 byte)
-        //    [6..7] name_len  (2 bytes, little-endian)
-        // --------------------------------------------------------------------
-        
-        unsigned char header[REQUEST_HEADER_SIZE] = { 0 };
+		// Prepare a response object
+        Response response;
 
-        if (!read_exact(socket_, header, REQUEST_HEADER_SIZE, error))
+		// Loop to handle multiple requests from the same client until the client disconnects
+		while (true)
         {
-            cerr << "[Server][Thread " << std::this_thread::get_id()
-                << "] Error reading header: " << error.message() << "\n";
-            return;
-        }
+			if (!this->socket_->is_open())
+			{
+				std::cout << "Client disconnected.\n";
+				break;
+			}
 
-        // Parse the header fields
-        // user_id (little-endian 32-bit)
+            // Read the client's request (blocking call)
+			boost::system::error_code ec;
+            auto [user_id, version, op_code, filename, file_data] = parser.read_request(ec);
 
-		uint32_t user_id = read_uint_32_le(header);
-
-        // version (1 byte)
-        uint8_t version = header[4];
-
-        // op_code (1 byte)
-        uint8_t op_code = header[5];
-
-        // name_len (little-endian 16-bit)
-		uint16_t name_len = read_uint_16_le(header, 6, 7);
-
-        // --------------------------------------------------------------------
-        // 2) Read the filename (name_len bytes)
-        // --------------------------------------------------------------------
-        
-		string filename;
-        if (name_len > 0)
-        {
-            vector<unsigned char> name_buf(name_len, 0);
-            if (!read_exact(socket_, name_buf.data(), name_len, error))
+            // Check for client disconnection
+            if (ec == boost::asio::error::eof || ec == boost::asio::error::connection_reset)
             {
-                cerr << "[Server][Thread " << this_thread::get_id()
-                    << "] Error reading filename: " << error.message() << "\n";
+                std::cout << "Client disconnected.\n";
+                break;
+            }
+
+			if (ec)
+			{
+				send_error_response(response, "Server Error: Error reading request: " + ec.message());
+				break;
+			}
+
+			// Basic check for path traversal
+            if (filename.find("..") != std::string::npos)
+            {
+                send_error_response(response,"Server Error: Invalid filename (possible path traversal).");
                 return;
             }
 
-            filename.assign(reinterpret_cast<const char*>(name_buf.data()), name_len);
-        }
+            // Setup a FileManager (responsible for file operations)
+            const FileManager file_manager(STORAGE_FOLDER);
 
-        // Debug output
-        cout << "[Server][Thread " << this_thread::get_id() << "]"
-            << " user_id = " << user_id
-            << ", version = " << (int)version
-            << ", op_code = " << (int)op_code
-            << ", filename = " << filename
-            << "\n";
-
-        //--------------------------------------------------------------
-        // We'll store the server's response in these local variables,
-        // then build a single binary response after we handle the request.
-        //--------------------------------------------------------------
-        
-        uint8_t  server_version = 1;  // e.g., server version
-        uint16_t response_status = (uint16_t)ServerStatus::ERR_GENERAL; // default
-        string response_filename;    // For the response header
-        vector<unsigned char> response_payload;
-
-        //--------------------------------------------------------------
-        // 3) Create main folder + user folder if needed
-        //--------------------------------------------------------------
-        if (!create_directory_if_not_exists(STORAGE_FOLDER))
-        {
-            cerr << "[Server] Cannot access " << STORAGE_FOLDER << "\n";
-            response_status = (uint16_t)ServerStatus::ERR_GENERAL;
-            // We'll build the response at the end
-        }
-
-        string user_folder = STORAGE_FOLDER + to_string(user_id) + "/";
-        create_directory_if_not_exists(user_folder);
-
-        
-
-        //--------------------------------------------------------------
-        // 4) Switch on op_code to handle different operations
-        //--------------------------------------------------------------
-
-        switch (op_code) {
-            
-            // ----------------------------------------------------------
-            // SAVE (backup) file => op_code = 100
-            // ----------------------------------------------------------
-            
-            case static_cast<uint8_t>(Command::SAVE_FILE):
+            // Create the root directory if it doesn't exist
+            try
             {
-                // Next 4 bytes => file_size
-                unsigned char size_buf[PAYLOAD_FILE_SIZE];
-                if (!read_exact(socket_, size_buf, PAYLOAD_FILE_SIZE, error))
-                {
-                    cerr << "[Server] Error reading file_size: " << error.message() << "\n";
-                    response_status = (uint16_t)ServerStatus::ERR_GENERAL;
-                    break;
-                }
-                uint32_t file_size = read_uint_32_le(size_buf);
-
-                // Strip path from filename
-                size_t last_slash = filename.find_last_of("/\\");
-                if (last_slash != string::npos)
-                {
-                    filename = filename.substr(last_slash + 1);
-                }
-
-				response_filename = filename;
-
-                // Save file
-                string file_path = user_folder + filename;
-                ofstream ofs(file_path, ios::binary);
-                if (!ofs.is_open())
-                {
-                    cerr << "[Server] Cannot open for writing: " << file_path << "\n";
-                    response_status = (uint16_t)ServerStatus::ERR_GENERAL;
-                    break;
-                }
-
-                uint32_t bytes_received = 0;
-                char data_buffer[MAX_BUFFER_SIZE];
-                while (bytes_received < file_size)
-                {
-                    uint32_t remain = file_size - bytes_received;
-                    size_t to_read = min<uint32_t>(remain, MAX_BUFFER_SIZE);
-
-                    size_t chunk = socket_->read_some(boost::asio::buffer(data_buffer, to_read), error);
-                    if (error)
-                    {
-                        cerr << "[Server] Error receiving file data: " << error.message() << "\n";
-                        response_status = (uint16_t)ServerStatus::ERR_GENERAL;
-                        break;
-                    }
-                    ofs.write(data_buffer, (streamsize)chunk);
-                    bytes_received += (uint32_t)chunk;
-                }
-                ofs.close();
-
-                //--------------------------------------------------------------
-                // Print the request as an ASCII table
-                // -------------------------------------------------------------
-
-                print_request_table(user_id, version, op_code, name_len, filename, file_size, reinterpret_cast<unsigned char*>(data_buffer));
-
-                // On success
-                if (bytes_received == file_size)
-                {
-                    // => status=212 means "success with no payload"
-                    response_status = (uint16_t)ServerStatus::SUCCESS_NO_PAYLOAD; // 212
-                }
+                file_manager.create_root_directory();
             }
-            break;
-
-            // ----------------------------------------------------------
-            // RETRIEVE (restore) file => op_code = 200
-            // ----------------------------------------------------------
-
-            case static_cast<uint8_t>(Command::RESTORE_FILES):
+            catch (const std::filesystem::filesystem_error& error)
             {
-                string file_path = user_folder + filename;
-                ifstream ifs(file_path, ios::binary | ios::ate);
-                if (!ifs.is_open())
-                {
-                    response_status = (uint16_t)ServerStatus::ERR_FILE_NOT_FOUND;
-                    break;
-                }
-
-                streampos file_size = ifs.tellg();
-                ifs.seekg(0, ios::beg);
-                response_payload.resize(static_cast<size_t>(file_size));
-                ifs.read(reinterpret_cast<char*>(response_payload.data()), file_size);
-                ifs.close();
-
-                response_filename = filename;
-                response_status = (uint16_t)ServerStatus::SUCCESS_FOUND;
+				send_error_response(response, "Server Error: Cannot create root directory: " + std::string(error.what()));
+				return;
             }
-			break;
 
-            // ----------------------------------------------------------
-            // DELETE file => op_code = 201
-            // ----------------------------------------------------------
-
-            case static_cast<uint8_t>(Command::DELETE_FILE):
+            // Create a user directory if it doesn't exist
+            try
             {
-                string file_path = user_folder + filename;
-                boost::system::error_code fs_error;
-				bool removed = filesystem::remove(file_path, fs_error);
-                if (removed && !fs_error)
+                file_manager.create_user_directory(user_id);
+            }
+            catch (const std::filesystem::filesystem_error& error)
+            {
+				send_error_response(response, "Server Error: Cannot create user directory: " + std::string(error.what()));
+                return;
+            }
+
+
+			// Remove any preceding slash/backslash from the filename
+            if (const auto last_slash = filename.find_last_of("/\\"); last_slash != std::string::npos)
+            {
+                filename = filename.substr(last_slash + 1);
+            }
+
+            // Switch on op_code
+            switch (op_code)
+            {
+            case Command::SAVE_FILE:
+            {
+                try
                 {
-                    response_status = (uint16_t)ServerStatus::SUCCESS_NO_PAYLOAD;
-                }
-                else
-                {
-                    if (!removed && !fs_error) 
+                    if (const bool success = file_manager.save_file(user_id, filename, file_data); !success)
                     {
-						response_status = (uint16_t)ServerStatus::ERR_FILE_NOT_FOUND;
+                        send_error_response(response, "Server Error: Error while the saving file: " + filename);
                     }
                     else
                     {
-						response_status = (uint16_t)ServerStatus::ERR_GENERAL;
+                        response.filename = filename;
+                        response.status = ServerStatus::SUCCESS_NO_PAYLOAD; // 212
+						parser.write_response(response);
                     }
-                }
-            }
-            break;
-
-            // ----------------------------------------------------------
-            // LIST all user files => op_code = 202
-            // ----------------------------------------------------------
-
-            case static_cast<uint8_t>(Command::LIST_FILES):
-            {
-				auto files = list_files_in_directory(user_folder);
-                if (files.empty())
-                {
-					response_status = (uint16_t)ServerStatus::ERR_NO_FILES;
                     break;
                 }
-
-                string txt_file_name = generate_random_filename();
-				string list_file_path = user_folder + txt_file_name;
-
-				ofstream ofs(list_file_path);
-                if (!ofs.is_open())
-                {
-					response_status = (uint16_t)ServerStatus::ERR_GENERAL;
+				catch (const std::filesystem::filesystem_error& error)
+				{
+					response.status = ServerStatus::ERR_GENERAL;
+					send_error_response(response, "Server error: " + std::string(error.what()));
 					break;
-                }
-
-                for (auto& file : files)
-                {
-					ofs << file << "\n";
-                }
-                ofs.close();
-
-                ifstream ifs(list_file_path, ios::binary | ios::ate);
-				auto file_size = ifs.tellg();
-				ifs.seekg(0, ios::beg);
-				response_payload.resize(static_cast<size_t>(file_size));
-				ifs.read(reinterpret_cast<char*>(response_payload.data()), file_size);
-                ifs.close();
-
-                response_status = (uint16_t)ServerStatus::SUCCESS_FILE_LIST;
-				response_filename = txt_file_name;
+				}
+				catch (...)
+				{
+					response.status = ServerStatus::ERR_GENERAL;
+					send_error_response(response, "Server Error: Error processing SAVE_FILE request.");
+                    break;
+				}
             }
-            break;
+
+            case Command::RESTORE_FILES:
+            {
+                try
+                {
+	                std::vector<unsigned char> data;
+                    response.filename = filename;
+
+                    if (const bool found = file_manager.read_file(user_id, filename, data); !found)
+                    {
+                        response.status = ServerStatus::ERR_FILE_NOT_FOUND;
+                        send_error_response(response, "Error restoring file: file not found for this user.");
+                    }
+                    else
+                    {
+                        response.status = ServerStatus::SUCCESS_FOUND;
+                        response.payload = std::move(data);
+						parser.write_response(response);
+                    }
+                    break;
+                }
+				catch (const std::filesystem::filesystem_error& error)
+				{
+					response.status = ServerStatus::ERR_GENERAL;
+					send_error_response(response, "Server error: " + std::string(error.what()));
+					break;
+				}
+				catch (...)
+				{
+					response.status = ServerStatus::ERR_GENERAL;
+					send_error_response(response, "Server Error: Error processing RESTORE_FILES request.");
+                    break;
+				}
+            }
+
+            case Command::DELETE_FILE:
+            {
+                try
+                {
+                    response.filename = filename;
+
+                    if (const bool removed = file_manager.delete_file(user_id, filename); !removed)
+                    {
+						response.status = ServerStatus::ERR_FILE_NOT_FOUND;
+						send_error_response(response,"Error deleting file: file not found for this user.");
+						break;
+                    }
+
+                    response.status = ServerStatus::SUCCESS_NO_PAYLOAD;
+					parser.write_response(response);
+                    break;
+				}
+                catch (const std::filesystem::filesystem_error& error)
+                {
+					response.status = ServerStatus::ERR_GENERAL;
+                    send_error_response(response, "Server error: " + std::string(error.what()));
+                    break;
+                }
+                catch (...)
+                {
+                    response.status = ServerStatus::ERR_GENERAL;
+					send_error_response(response, "Server Error: Error processing DELETE_FILE request.");
+                    break;
+                }
+            }
+
+            case Command::LIST_FILES:
+            {
+                try
+                {
+	                if (const auto files = file_manager.list_user_files(user_id); files.empty())
+                    {
+						response.status = ServerStatus::ERR_NO_FILES;
+						send_error_response(response, "Error listing files: no files found for this user.");
+                        break;
+                    }
+                    else
+                    {
+                        // create a random txt file containing the list
+                        std::string txt_file = file_manager.write_file_list(user_id, files);
+
+                        // read that file into 'payload'
+                        std::vector<unsigned char> data;
+                        if (const bool ok = file_manager.read_file(user_id, txt_file, data); !ok)
+                        {
+							response.status = ServerStatus::ERR_GENERAL;
+							send_error_response(response, "Server Error: Error while reading file list.");
+                            break;
+                        }
+                        
+                        response.status = ServerStatus::SUCCESS_FILE_LIST;
+                    	response.filename = txt_file;
+                    	response.payload = std::move(data);
+						parser.write_response(response);
+						break;
+                    }
+                }
+				catch (const std::filesystem::filesystem_error& error)
+				{
+					response.status = ServerStatus::ERR_GENERAL;
+					send_error_response(response, "Server Error: " + std::string(error.what()));
+					break;
+				}
+				catch (...)
+				{
+					response.status = ServerStatus::ERR_GENERAL;
+					send_error_response(response, "Server Error: Error processing LIST_FILES request.");
+					break;
+				}
+            }
 
             default:
-				response_status = (uint16_t)ServerStatus::ERR_GENERAL;
-                break;
+				send_error_response(response, "Server error: the operation [" + std::to_string(static_cast<int>(op_code)) + "] is not supported.");
+                continue;
+            }
+
+			// Clear the response for the next iteration
+			response = Response();
+
         }
-
-        //--------------------------------------------------------------
-        // 5) Build the final binary response
-        //
-        //    Response:
-        //      - version  (1 byte)
-        //      - status   (2 bytes, LE)
-        //      - name_len (2 bytes, LE)
-        //      - filename (name_len bytes)
-        //      - if status in [210,211]: size (4 bytes, LE) + payload
-        //        else no payload and size
-        //--------------------------------------------------------------
-        
-		vector<unsigned char> response;
-
-        // (1) version (1 byte)
-		write_uint8(response, server_version);
-
-        // (2) status (2 bytes, LE)
-		write_uint16_le(response, response_status);
-
-        // (3) name_len (2 bytes, LE)
-        uint16_t response_name_len = static_cast<uint16_t>(response_filename.size());
-		write_uint16_le(response, response_name_len);
-
-        // (4) filename
-        response.insert(response.end(), response_filename.begin(), response_filename.end());
-
-        // If status in {210, 211} => add payload
-        if (response_status == 210 || response_status == 211)
-        {
-            // 4-byte payload size
-            uint32_t psize = static_cast<uint32_t>(response_payload.size());
-			write_uint32_le(response, psize);
-
-            // payload
-            response.insert(response.end(), response_payload.begin(), response_payload.end());
-        }
-
-		boost::asio::write(*socket_, boost::asio::buffer(response), error);
-        if (error)
-        {
-            std::cerr << "[Server][Thread " << std::this_thread::get_id()
-                << "] Error sending response: " << error.message() << "\n";
-        }
-        else
-        {
-            std::cout << "[Server][Thread " << std::this_thread::get_id()
-                << "] Sent response: status=" << response_status
-                << ", filename=" << response_filename
-                << ", payload_size=" << response_payload.size() << "\n";
-        }
-
     }
-    catch (const exception& e)
+    catch (const std::exception& e)
     {
-        cerr << "[Server][Thread " << this_thread::get_id()
-            << "] Exception: " << e.what() << "\n";
+		Response response;
+        std::cerr << "[Server][Thread " << std::this_thread::get_id()
+            << "] Exception in handle_client_requests(): " << e.what() << "\n";
+
+		send_error_response(response, "Fatal server error: " + std::string(e.what()));
+    }
+}
+
+void ClientSession::send_error_response(const Response& response, const std::string& message) const
+{
+	std::cerr << " => returning error " << static_cast<uint16_t>(response.status) << "\n";
+
+    try {
+        ProtocolParcer parser(socket_);
+		parser.write_response(response);
+    }
+    catch (...) {
+	    std::cerr << "[Server][Thread " << std::this_thread::get_id()
+			<< "] Error sending error response\n";
     }
 }
