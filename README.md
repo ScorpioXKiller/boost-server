@@ -31,3 +31,125 @@ This repository contains a **C++-based server application** that interacts with 
 #### Installing Boost (if not already installed)
 
 - **Ubuntu/Debian**:
+
+  ```bash
+  sudo apt-get install libboost-all-dev
+  ```
+
+- **CentOS/Fedora**:
+  ```bash 
+  sudo yum install boost-devel
+  ```
+
+- **Windows**:
+  - Download and install Boost from the official website: [Boost Downloads](https://www.boost.org/users/download/)
+
+### Build Instructions
+
+1. **Clone the Repository**:
+
+   ```bash
+   git clone https://github.com/yourusername/file-server-manager.git cd file-server-manager 
+   ```
+
+2. **Build the Server**:
+
+   - Using a **Makefile** (if provided):
+
+   ```bash
+   make
+   ```
+
+   - Alternatively, compile using `g++`:
+
+   ```bash
+    g++ -std=c++17 -o server main.cpp Server.cpp utility.cpp -lboost_system
+   ```
+
+### Running the Server
+
+1. **Configure the Server**:
+
+   - The default port is set to `8080` in `main.cpp`. To change the port, modify the `PORT` constant:
+
+     ```cpp
+     constexpr unsigned short PORT = your_desired_port;
+     ```
+
+2. **Run the Server**:
+
+   ```bash
+   ./server
+   ```
+   
+   - The server will start listening on the specified port and output:
+
+   ```bash
+     Server started on port 8080
+     ```
+
+3. **Connect with the Client**:
+
+   - Ensure the Python client is configured to connect to the correct IP and port specified by the server.
+   - Follow the client's instructions to perform file operations.
+
+## Example
+
+Here is an example of how to use the server alongside the Python client:
+
+1. **Start the Server**:
+
+   ```bash
+   ./server
+   ```
+
+2. **Prepare the Client**:
+
+   - Update the `server.info` file in the client repository with the server's IP and port:
+
+   ```bash
+    127.0.0.1:8080
+   ```
+
+3. **Run the Python Client**:
+
+   ```bash
+   python client.py
+   ```
+   - The client will connect to the server and display the available commands.
+
+
+4. **Perform Operations**:
+
+   - Use the client to send requests to the server for backing up, restoring, listing, or deleting files.
+
+## Documentation
+
+Each file and class in the repository includes comprehensive comments explaining its purpose, parameters, and functionality. Here is a brief overview:
+
+- **`main.cpp`**: Contains the `main` function that initializes the server and starts the `io_context` event loop.
+- **`Server` Class** (`Server.h` / `Server.cpp`): Manages client connections, reads incoming data, parses requests, and sends responses.
+- **`Request` Struct** (`Request.h`): Represents a parsed client request, including user ID, operation code, filename, and file data.
+- **`Response` Struct** (`Response.h`): Represents the server's response, including status codes, filenames, and payloads.
+- **`protocols.h`**: Defines enums for `Command` and `ServerStatus` to standardize operation codes and status responses.
+- **Utility Functions** (`utility.h` / `utility.cpp`): Includes functions for reading and writing data in little-endian format, hex dumping, and printing request details.
+
+## Dependencies
+
+- **Boost.Asio**: For asynchronous networking operations.
+- **C++17 Standard**: Utilizes modern C++ features; ensure your compiler supports C++17.
+
+## Notes
+
+- **Error Handling**: The server includes basic error handling and will output exceptions to `stderr`.
+- **Asynchronous Design**: Designed to handle multiple client connections using asynchronous operations without blocking the main thread.
+
+## Author
+
+- **Dmitriy Gorodov**
+- **ID**: 342725405
+- **Date**: 24/01/2025
+
+## License
+
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.   
