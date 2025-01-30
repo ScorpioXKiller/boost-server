@@ -1,5 +1,5 @@
 /**
- * @file ProtocolParcer.h
+ * @file ProtocolParcer.cpp
  * @brief ProtocolParcer class implementation.
  * @details This file contains the implementation of the ProtocolParcer class, which reads requests from and writes responses to the client following a specific protocol.
  *
@@ -9,8 +9,8 @@
  * @date 24/01/2025
  */
 
-#include "ProtocolParcer.h"
-#include "utility.h"
+#include "ProtocolParcer.hpp"
+#include "utility.hpp"
 
 #include <iostream>
 

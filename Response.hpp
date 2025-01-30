@@ -1,5 +1,5 @@
 /**
- * @file Response.h
+ * @file Response.hpp
  * @brief Defines the Response struct for server responses.
  * @details This file contains the definition of the Response struct used for server responses to client requests.
  *
@@ -11,7 +11,7 @@
 
 #pragma once
 
-#include "protocols.h"
+#include "protocols.hpp"
 
 #include <string>
 #include <vector>

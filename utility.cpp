@@ -1,5 +1,5 @@
 /**
- * @file utility.h
+ * @file utility.cpp
  * @brief This file implements utility functions.
  * @details It contains utility functions for reading and writing integers in little-endian format.
  *
@@ -9,7 +9,7 @@
  * @date 24/01/2025
  */
 
-#include "utility.h"
+#include "utility.hpp"
 
 uint16_t read_uint_16_le(const unsigned char* data, const short start, const short end) {
     return data[start] |

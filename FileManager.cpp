@@ -1,5 +1,5 @@
 /**
- * @file FileManager.h
+ * @file FileManager.cpp
  * @brief FileManager class implementation.
  * @details This class handles creating directories, saving, reading, deleting, and listing files.
  * 
@@ -9,7 +9,7 @@
  * @date 24/01/2025
  */
 
-#include "FileManager.h"
+#include "FileManager.hpp"
 
 #include <boost/asio.hpp>
 #include <filesystem>

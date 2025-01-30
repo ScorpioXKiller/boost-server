@@ -1,5 +1,5 @@
 /**
- * @file ClientSession.h
+ * @file ClientSession.hpp
  * @brief ClientSession class definition.
  * @details This header file contains the ClientSession class definition for handling client requests.
  * @version 1.0
@@ -9,7 +9,7 @@
  */
 
 #pragma once
-#include "Response.h"
+#include "Response.hpp"
 
 #include <boost/asio.hpp>
 #include <string>

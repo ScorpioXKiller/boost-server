@@ -9,7 +9,7 @@
  * @author Dmitriy Gorodov
  */
 
-#include "Server.h"
+#include "Server.hpp"
 #include <iostream>
 
 constexpr unsigned short PORT = 8080;

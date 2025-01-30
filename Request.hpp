@@ -1,5 +1,5 @@
 /**
- * @file Request.h
+ * @file Request.hpp
  * @brief Defines the Request struct for client requests.
  * @details This file contains the definition of the Request struct used for client requests to the server.
  *
@@ -11,7 +11,7 @@
 
 #pragma once
 
-#include "protocols.h"
+#include "protocols.hpp"
 
 #include <string>
 #include <vector>

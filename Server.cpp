@@ -1,5 +1,5 @@
 /**
- * @file Server.h
+ * @file Server.cpp
  * @brief Server class implementation.
  * @details This class manages the server operations, including accepting client connections and handling them.
  *
@@ -9,8 +9,8 @@
  * @date 24/01/2025
  */
 
-#include "Server.h"
-#include "ClientSession.h"
+#include "Server.hpp"
+#include "ClientSession.hpp"
 #include <iostream>
 
 using boost::asio::ip::tcp;

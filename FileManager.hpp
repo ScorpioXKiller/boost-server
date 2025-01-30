@@ -1,5 +1,5 @@
 /**
- * @file FileManager.h
+ * @file FileManager.hpp
  * @brief FileManager class definition.
  * @details This header file contains the FileManager class definition for managing file-related operations, such as saving, reading, deleting, and listing files.
  *

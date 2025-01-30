@@ -1,5 +1,5 @@
 /**
- * @file protocols.h
+ * @file protocols.hpp
  * @brief Defines the Command and ServerStatus enums for protocol operations.
  * @details This file contains the definitions of the Command and ServerStatus enums used for client-server communication.
  *

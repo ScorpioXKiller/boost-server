@@ -1,5 +1,5 @@
 /**
- * @file ProtocolParcer.h
+ * @file ProtocolParcer.hpp
  * @brief ProtocolParcer class definition.
  * @details This header file contains the ProtocolParcer class definition for reading requests from and writing responses to the client, following a specific protocol.
  * @version 1.0
@@ -9,8 +9,8 @@
  */
 
 #pragma once
-#include "Request.h"
-#include "Response.h"
+#include "Request.hpp"
+#include "Response.hpp"
 #include <boost/asio.hpp>
 
 constexpr short MAX_BUFFER_SIZE = 4096; // 4KB 

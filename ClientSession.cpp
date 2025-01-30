@@ -1,5 +1,5 @@
 /**
- * @file ClientSession.h
+ * @file ClientSession.cpp
  * @brief ClientSession class implementation.
  * @details This class manages the lifecycle of a client session, including reading requests, processing commands, and sending responses.
  *
@@ -9,13 +9,13 @@
  * @date 24/01/2025
  */
 
-#include "ClientSession.h"
-#include "utility.h"
-#include "protocols.h"
-#include "ProtocolParcer.h"
-#include "FileManager.h"
-#include "Request.h"
-#include "Response.h"
+#include "ClientSession.hpp"
+#include "utility.hpp"
+#include "protocols.hpp"
+#include "ProtocolParcer.hpp"
+#include "FileManager.hpp"
+#include "Request.hpp"
+#include "Response.hpp"
 
 #include <iostream>
 #include <filesystem>

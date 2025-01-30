@@ -1,5 +1,5 @@
 /**
- * @file utility.h
+ * @file utility.hpp
  * @brief This file defines utility functions.
  * @details It contains utility functions for reading and writing integers in little-endian format.
  *

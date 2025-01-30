@@ -1,5 +1,5 @@
 /**
- * @file Server.h
+ * @file Server.hpp
  * @brief Server class definition.
  * @details This header file contains the Server class definition for managing client connections and handling them asynchronously.
  *
